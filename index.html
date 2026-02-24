@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Melusina — Wallet Auth</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --accent: #0f3460;
+    --primary: #e94560;
+    --text: #eaeaea;
+    --muted: #8892b0;
+    --success: #64ffda;
+    --warn: #ffd93d;
+    --border: #233554;
+    --radius: 12px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 16px;
+  }
+  .container {
+    max-width: 420px;
+    width: 100%;
+  }
+  .header {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  .header h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .header .sub {
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .card h2 {
+    font-size: 14px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+  }
+  .nonce-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    word-break: break-all;
+    color: var(--success);
+    position: relative;
+    cursor: pointer;
+  }
+  .nonce-box .copy-hint {
+    position: absolute;
+    top: 4px;
+    right: 8px;
+    font-size: 10px;
+    color: var(--muted);
+    font-family: -apple-system, sans-serif;
+  }
+  .wallet-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .wallet-btn {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    width: 100%;
+    text-align: left;
+  }
+  .wallet-btn:hover {
+    border-color: var(--primary);
+    background: var(--accent);
+  }
+  .wallet-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .wallet-btn .icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .wallet-btn .badge {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--success);
+    background: rgba(100, 255, 218, 0.1);
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+  .wallet-btn .badge.missing {
+    color: var(--muted);
+    background: rgba(136, 146, 176, 0.1);
+  }
+  .status-area {
+    text-align: center;
+    padding: 16px;
+  }
+  .status-area .spinner {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    border: 3px solid var(--border);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .status-area .result {
+    font-size: 14px;
+    margin-top: 8px;
+  }
+  .status-area .result.ok { color: var(--success); }
+  .status-area .result.err { color: var(--primary); }
+  .connected-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    font-size: 13px;
+  }
+  .connected-info .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success);
+    flex-shrink: 0;
+  }
+  .connected-info .addr {
+    font-family: 'SF Mono', monospace;
+    color: var(--success);
+    font-size: 12px;
+  }
+  .sign-btn {
+    width: 100%;
+    padding: 16px;
+    border: none;
+    border-radius: var(--radius);
+    background: var(--primary);
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .sign-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+  .sign-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+  }
+  .manual-section {
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+    margin-top: 16px;
+  }
+  .manual-section summary {
+    color: var(--muted);
+    font-size: 13px;
+    cursor: pointer;
+    margin-bottom: 12px;
+  }
+  .manual-section .manual-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'SF Mono', monospace;
+    font-size: 12px;
+    margin-bottom: 8px;
+    outline: none;
+  }
+  .manual-section .manual-input:focus {
+    border-color: var(--primary);
+  }
+  .manual-section .manual-input::placeholder {
+    color: var(--muted);
+  }
+  .manual-submit {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--primary);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--primary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .manual-submit:hover { background: rgba(233, 69, 96, 0.1); }
+  .or-divider {
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    margin: 16px 0;
+    position: relative;
+  }
+  .or-divider::before, .or-divider::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    height: 1px;
+    width: 40%;
+    background: var(--border);
+  }
+  .or-divider::before { left: 0; }
+  .or-divider::after { right: 0; }
+  .timer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 12px;
+  }
+  .timer .time { color: var(--warn); font-weight: 600; }
+  .hidden { display: none !important; }
+  .fade-in {
+    animation: fadeIn 0.3s ease-in;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <h1>🔐 Melusina Watchdog</h1>
+    <div class="sub">Authenticate with your Solana wallet</div>
+  </div>
+
+  <!-- Step 1: Nonce -->
+  <div class="card" id="step-nonce">
+    <h2>Challenge Nonce</h2>
+    <div class="nonce-box" id="nonce-display" onclick="copyNonce()">
+      <span class="copy-hint">tap to copy</span>
+      <span id="nonce-text">loading...</span>
+    </div>
+    <div class="timer" id="timer">Expires in <span class="time" id="countdown">10:00</span></div>
+  </div>
+
+  <!-- Step 2: Connect wallet -->
+  <div class="card" id="step-connect">
+    <h2>Connect Wallet</h2>
+    <div id="wallet-list" class="wallet-buttons"></div>
+
+    <!-- Connected state -->
+    <div id="connected-state" class="hidden fade-in">
+      <div class="connected-info">
+        <div class="dot"></div>
+        <span>Connected:</span>
+        <span class="addr" id="connected-addr"></span>
+      </div>
+      <button class="sign-btn" id="sign-btn" onclick="signNonce()">
+        ✍️ Sign & Authenticate
+      </button>
+    </div>
+  </div>
+
+  <!-- Status area (signing / result) -->
+  <div class="card hidden" id="step-status">
+    <div class="status-area">
+      <div class="spinner" id="spinner"></div>
+      <div class="result" id="status-text">Signing...</div>
+    </div>
+  </div>
+
+  <!-- Manual fallback -->
+  <div class="card" id="step-manual">
+    <details class="manual-section">
+      <summary>📋 Manual verification (CLI / paste)</summary>
+      <p style="color: var(--muted); font-size: 12px; margin-bottom: 12px; line-height: 1.5;">
+        If your wallet isn't detected (mobile, Ledger, etc.), sign the nonce
+        externally and paste the result below.
+      </p>
+      <input class="manual-input" id="manual-wallet" type="text"
+             placeholder="Wallet pubkey (base58)">
+      <input class="manual-input" id="manual-sig" type="text"
+             placeholder="Signature (base58)">
+      <button class="manual-submit" onclick="submitManual()">
+        Submit Verification
+      </button>
+      <p style="color: var(--muted); font-size: 11px; margin-top: 10px; line-height: 1.5;">
+        <strong>CLI:</strong><br>
+        <code style="color: var(--success); font-size: 11px;">echo -n '<span class="cli-nonce"></span>' | solana sign-offchain-message --signer ~/keyholder.json</code>
+      </p>
+    </details>
+  </div>
+</div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────
+const tg = window.Telegram?.WebApp;
+const isTWA = !!(tg && tg.initData);
+
+// Read nonce from URL hash or Telegram start_param
+let nonce = '';
+if (window.location.hash) {
+  const params = new URLSearchParams(window.location.hash.substring(1));
+  nonce = params.get('nonce') || window.location.hash.substring(1);
+}
+// Telegram Mini App start_param (passed via t.me/bot?startapp=xxx)
+if (!nonce && tg?.initDataUnsafe?.start_param) {
+  nonce = tg.initDataUnsafe.start_param;
+}
+// Fallback: URL search params
+if (!nonce) {
+  const sp = new URLSearchParams(window.location.search);
+  nonce = sp.get('nonce') || '';
+}
+
+// If inside Telegram Mini App, adapt theme
+if (isTWA) {
+  tg.expand();
+  tg.ready();
+  document.body.style.background = tg.themeParams?.bg_color || '#1a1a2e';
+}
+
+// ── State ─────────────────────────────────────────────────────
+let connectedProvider = null;
+let connectedWallet = '';
+let expiresAt = Date.now() + 10 * 60 * 1000;
+
+// ── Base58 ────────────────────────────────────────────────────
+const B58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+function base58encode(bytes) {
+  const digits = [0];
+  for (const byte of bytes) {
+    let carry = byte;
+    for (let j = 0; j < digits.length; j++) {
+      carry += digits[j] << 8;
+      digits[j] = carry % 58;
+      carry = (carry / 58) | 0;
+    }
+    while (carry > 0) {
+      digits.push(carry % 58);
+      carry = (carry / 58) | 0;
+    }
+  }
+  let str = '';
+  for (const byte of bytes) {
+    if (byte !== 0) break;
+    str += '1';
+  }
+  for (let i = digits.length - 1; i >= 0; i--) {
+    str += B58_ALPHABET[digits[i]];
+  }
+  return str;
+}
+
+// ── Wallet detection ──────────────────────────────────────────
+function detectWallets() {
+  const wallets = [];
+
+  // Solflare (extension or in-app browser)
+  if (window.solflare?.isSolflare) {
+    wallets.push({
+      name: 'Solflare',
+      icon: '🟣',
+      provider: window.solflare,
+      detected: true
+    });
+  }
+
+  // Phantom
+  if (window.phantom?.solana?.isPhantom) {
+    wallets.push({
+      name: 'Phantom',
+      icon: '👻',
+      provider: window.phantom.solana,
+      detected: true
+    });
+  }
+
+  // Backpack
+  if (window.backpack?.solana) {
+    wallets.push({
+      name: 'Backpack',
+      icon: '🎒',
+      provider: window.backpack.solana,
+      detected: true
+    });
+  }
+
+  // Solana wallet standard (generic)
+  if (window.solana && !window.phantom?.solana && !window.solflare) {
+    wallets.push({
+      name: 'Browser Wallet',
+      icon: '🔑',
+      provider: window.solana,
+      detected: true
+    });
+  }
+
+  return wallets;
+}
+
+function renderWallets() {
+  const list = document.getElementById('wallet-list');
+  const wallets = detectWallets();
+
+  if (wallets.length === 0) {
+    // No wallets detected — show install hints + manual is primary
+    list.innerHTML = `
+      <div style="text-align:center; padding: 16px; color: var(--muted); font-size: 13px; line-height: 1.6;">
+        <p style="margin-bottom: 12px;">No Solana wallet detected.</p>
+        <p><strong>Desktop:</strong> Install
+          <a href="https://solflare.com/download" target="_blank" style="color: var(--primary);">Solflare</a> or
+          <a href="https://phantom.app/download" target="_blank" style="color: var(--primary);">Phantom</a>
+          extension, then reload.
+        </p>
+        <p style="margin-top: 8px;"><strong>Mobile:</strong> Open this page in your wallet's
+          built-in browser, or use the manual form below.</p>
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = '';
+  for (const w of wallets) {
+    const btn = document.createElement('button');
+    btn.className = 'wallet-btn';
+    btn.innerHTML = `
+      <span class="icon">${w.icon}</span>
+      <span>${w.name}</span>
+      <span class="badge">${w.detected ? 'detected' : 'not found'}</span>`;
+    btn.disabled = !w.detected;
+    btn.onclick = () => connectWallet(w);
+    list.appendChild(btn);
+  }
+}
+
+// ── Connect ───────────────────────────────────────────────────
+async function connectWallet(wallet) {
+  try {
+    // Disable all buttons during connect
+    document.querySelectorAll('.wallet-btn').forEach(b => b.disabled = true);
+
+    await wallet.provider.connect();
+    const pubkey = wallet.provider.publicKey.toString();
+
+    connectedProvider = wallet.provider;
+    connectedWallet = pubkey;
+
+    // Show connected state
+    document.getElementById('wallet-list').classList.add('hidden');
+    const connState = document.getElementById('connected-state');
+    connState.classList.remove('hidden');
+    document.getElementById('connected-addr').textContent =
+      pubkey.slice(0, 6) + '...' + pubkey.slice(-4);
+
+  } catch (err) {
+    console.error('Connect failed:', err);
+    document.querySelectorAll('.wallet-btn').forEach(b => b.disabled = false);
+    showStatus('Connection rejected: ' + (err.message || 'User cancelled'), true);
+  }
+}
+
+// ── Sign ──────────────────────────────────────────────────────
+async function signNonce() {
+  if (!connectedProvider || !nonce) return;
+
+  const signBtn = document.getElementById('sign-btn');
+  signBtn.disabled = true;
+  signBtn.textContent = '⏳ Waiting for wallet...';
+
+  try {
+    const message = new TextEncoder().encode(nonce);
+
+    // signMessage returns different shapes depending on wallet
+    let sigBytes;
+    const result = await connectedProvider.signMessage(message, 'utf8');
+    if (result instanceof Uint8Array) {
+      sigBytes = result;
+    } else if (result?.signature) {
+      sigBytes = result.signature instanceof Uint8Array
+        ? result.signature
+        : new Uint8Array(result.signature);
+    } else {
+      throw new Error('Unexpected signMessage response');
+    }
+
+    const signature = base58encode(sigBytes);
+    submitResult(connectedWallet, signature);
+
+  } catch (err) {
+    console.error('Sign failed:', err);
+    signBtn.disabled = false;
+    signBtn.textContent = '✍️ Sign & Authenticate';
+    showStatus('Signing rejected: ' + (err.message || 'User declined'), true);
+  }
+}
+
+// ── Submit result ─────────────────────────────────────────────
+function submitResult(wallet, signature) {
+  document.getElementById('step-connect').classList.add('hidden');
+  document.getElementById('step-manual').classList.add('hidden');
+  const statusEl = document.getElementById('step-status');
+  statusEl.classList.remove('hidden');
+
+  const data = JSON.stringify({ wallet, signature, nonce });
+
+  if (isTWA) {
+    // Inside Telegram Mini App — send via WebApp API
+    // Data goes directly to the bot, zero exposure of sidecar IP
+    document.getElementById('status-text').textContent = 'Sending to bot...';
+    try {
+      tg.sendData(data);
+      showStatus('✅ Sent! Check Telegram for your auth result.', false);
+      setTimeout(() => tg.close(), 1500);
+    } catch (err) {
+      // sendData might fail if not launched from KeyboardButton
+      showTelegramFallback(wallet, signature);
+    }
+  } else {
+    // Not inside TWA — show the /verify command to copy
+    showTelegramFallback(wallet, signature);
+  }
+}
+
+function showTelegramFallback(wallet, signature) {
+  const statusEl = document.getElementById('step-status');
+  const verifyCmd = `/verify ${wallet} ${signature}`;
+  document.getElementById('spinner').classList.add('hidden');
+  document.getElementById('status-text').innerHTML = `
+    <div style="text-align:left;">
+      <p style="color: var(--success); font-size: 16px; margin-bottom: 12px;">✅ Signature ready!</p>
+      <p style="color: var(--muted); font-size: 13px; margin-bottom: 12px;">
+        Copy this command and paste it in the Telegram bot chat:
+      </p>
+      <div class="nonce-box" onclick="navigator.clipboard.writeText(this.dataset.cmd).then(()=>this.querySelector('.copy-hint').textContent='copied!')"
+           data-cmd="${verifyCmd}" style="font-size: 11px; cursor: pointer; margin-bottom: 12px;">
+        <span class="copy-hint">tap to copy</span>
+        ${escapeHtml(verifyCmd)}
+      </div>
+      <a href="https://t.me/" style="color: var(--primary); font-size: 14px;">
+        Open Telegram →
+      </a>
+    </div>`;
+}
+
+// ── Manual submit ─────────────────────────────────────────────
+function submitManual() {
+  const wallet = document.getElementById('manual-wallet').value.trim();
+  const sig = document.getElementById('manual-sig').value.trim();
+
+  if (!wallet || !sig) {
+    alert('Please enter both wallet pubkey and signature.');
+    return;
+  }
+  if (wallet.length < 32 || wallet.length > 44) {
+    alert('Invalid wallet address — should be 32-44 characters (base58).');
+    return;
+  }
+
+  submitResult(wallet, sig);
+}
+
+// ── Status display ────────────────────────────────────────────
+function showStatus(msg, isError) {
+  const statusEl = document.getElementById('step-status');
+  statusEl.classList.remove('hidden');
+  document.getElementById('spinner').classList.add('hidden');
+  const textEl = document.getElementById('status-text');
+  textEl.className = 'result ' + (isError ? 'err' : 'ok');
+  textEl.textContent = msg;
+  if (!isError) {
+    setTimeout(() => {
+      statusEl.classList.add('hidden');
+      document.getElementById('spinner').classList.remove('hidden');
+    }, 3000);
+  }
+}
+
+// ── Countdown timer ───────────────────────────────────────────
+function updateTimer() {
+  const remaining = Math.max(0, expiresAt - Date.now());
+  const min = Math.floor(remaining / 60000);
+  const sec = Math.floor((remaining % 60000) / 1000);
+  document.getElementById('countdown').textContent =
+    `${min}:${sec.toString().padStart(2, '0')}`;
+  if (remaining <= 0) {
+    document.getElementById('countdown').textContent = 'EXPIRED';
+    document.getElementById('countdown').style.color = 'var(--primary)';
+    document.getElementById('sign-btn')?.setAttribute('disabled', 'true');
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────
+function copyNonce() {
+  navigator.clipboard.writeText(nonce).then(() => {
+    document.querySelector('#nonce-display .copy-hint').textContent = 'copied!';
+    setTimeout(() => {
+      document.querySelector('#nonce-display .copy-hint').textContent = 'tap to copy';
+    }, 2000);
+  });
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ── Init ──────────────────────────────────────────────────────
+document.getElementById('nonce-text').textContent = nonce || 'ERROR: No nonce provided';
+document.querySelectorAll('.cli-nonce').forEach(el => el.textContent = nonce);
+renderWallets();
+updateTimer();
+setInterval(updateTimer, 1000);
+
+// Re-check wallets after a delay (some extensions inject late)
+setTimeout(renderWallets, 1500);
+</script>
+</body>
+</html>
