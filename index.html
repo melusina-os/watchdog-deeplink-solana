@@ -131,6 +131,52 @@
     color: var(--muted);
     background: rgba(136, 146, 176, 0.1);
   }
+  .deeplink-section {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .deeplink-section .hint {
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.6;
+    margin-bottom: 12px;
+  }
+  .deeplink-section .hint strong {
+    color: var(--warn);
+  }
+  .deeplink-btn {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border: 2px solid var(--primary);
+    border-radius: var(--radius);
+    background: rgba(233, 69, 96, 0.08);
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    width: 100%;
+    text-align: left;
+    text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .deeplink-btn:hover {
+    background: rgba(233, 69, 96, 0.18);
+    transform: translateY(-1px);
+  }
+  .deeplink-btn .icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
   .status-area {
     text-align: center;
     padding: 16px;
@@ -445,18 +491,54 @@ function renderWallets() {
   const wallets = detectWallets();
 
   if (wallets.length === 0) {
-    // No wallets detected — show install hints + manual is primary
-    list.innerHTML = `
-      <div style="text-align:center; padding: 16px; color: var(--muted); font-size: 13px; line-height: 1.6;">
-        <p style="margin-bottom: 12px;">No Solana wallet detected.</p>
-        <p><strong>Desktop:</strong> Install
-          <a href="https://solflare.com/download" target="_blank" style="color: var(--primary);">Solflare</a> or
-          <a href="https://phantom.app/download" target="_blank" style="color: var(--primary);">Phantom</a>
-          extension, then reload.
-        </p>
-        <p style="margin-top: 8px;"><strong>Mobile:</strong> Open this page in your wallet's
-          built-in browser, or use the manual form below.</p>
-      </div>`;
+    // Build the current page URL with nonce so the wallet browser reopens it correctly
+    const currentUrl = window.location.href;
+    const encodedUrl = encodeURIComponent(currentUrl);
+
+    // In Telegram WebView or mobile with no wallets → show deeplink buttons
+    if (isTWA) {
+      list.innerHTML = `
+        <div style="text-align:center; padding: 12px; color: var(--muted); font-size: 13px; line-height: 1.6;">
+          <p style="margin-bottom: 8px;">Telegram's browser cannot access wallets directly.</p>
+          <p><strong style="color: var(--warn);">Open this page in your wallet app to sign:</strong></p>
+        </div>
+        <div class="deeplink-section" style="border-top: none; margin-top: 0; padding-top: 0;">
+          <a class="deeplink-btn" href="https://solflare.com/ul/v1/browse/${encodedUrl}">
+            <span class="icon">🟣</span>
+            <span>Open in Solflare</span>
+          </a>
+          <a class="deeplink-btn" href="https://phantom.app/ul/browse/${encodedUrl}">
+            <span class="icon">👻</span>
+            <span>Open in Phantom</span>
+          </a>
+        </div>
+        <div style="text-align:center; color: var(--muted); font-size: 11px; margin-top: 8px; line-height: 1.5;">
+          <p>This opens the wallet app's browser where signing works.<br>
+          If you don't have either app, install one first.</p>
+        </div>`;
+    } else {
+      // Desktop or non-Telegram mobile — show install hints + deeplinks
+      list.innerHTML = `
+        <div style="text-align:center; padding: 16px; color: var(--muted); font-size: 13px; line-height: 1.6;">
+          <p style="margin-bottom: 12px;">No Solana wallet detected.</p>
+          <p><strong>Desktop:</strong> Install
+            <a href="https://solflare.com/download" target="_blank" style="color: var(--primary);">Solflare</a> or
+            <a href="https://phantom.app/download" target="_blank" style="color: var(--primary);">Phantom</a>
+            extension, then reload.
+          </p>
+          <p style="margin-top: 8px;"><strong>Mobile:</strong> Tap below to open in your wallet's browser:</p>
+        </div>
+        <div class="deeplink-section" style="border-top: none; margin-top: 0; padding-top: 0;">
+          <a class="deeplink-btn" href="https://solflare.com/ul/v1/browse/${encodedUrl}">
+            <span class="icon">🟣</span>
+            <span>Open in Solflare</span>
+          </a>
+          <a class="deeplink-btn" href="https://phantom.app/ul/browse/${encodedUrl}">
+            <span class="icon">👻</span>
+            <span>Open in Phantom</span>
+          </a>
+        </div>`;
+    }
     return;
   }
 
